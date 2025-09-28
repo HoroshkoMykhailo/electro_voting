@@ -7,7 +7,7 @@ class Voter:
         self.voter_id = voter_id
         self.private_key = private_key
 
-    def create_and_send_ballot(self, candidate_name):
+    def create_ballot(self, candidate_name):
         n_voter = self.private_key[1]
         
         print(f"[{self.voter_id}]: Обирає кандидата '{candidate_name}'.")

@@ -15,13 +15,13 @@ print("\n--- ELECTION: Починається процес голосуванн�
 choices = ["Володимир Зеленський", "Петро Порошенко", "Володимир Зеленський", "Володими Зеленський", "Петро Порошенко"]
 
 for i, voter in enumerate(voters):
-    ballot_package = voter.create_and_send_ballot(choices[i])
+    ballot_package = voter.create_ballot(choices[i])
     cec.receive_ballot(voter.voter_id, ballot_package)
     print(f"===> Бюлетень від {voter.voter_id} надіслано до ЦВК.\n")
 
 # --- a. Тест на повторне голосування ---
 print("\n--- Тест А: Виборець-1 намагається проголосувати вдруге ---")
-voter1_ballot = voters[0].create_and_send_ballot("Петро Порошенко")
+voter1_ballot = voters[0].create_ballot("Петро Порошенко")
 cec.receive_ballot(voters[0].voter_id, voter1_ballot)
 
 # --- b. Тест на голосування незареєстрованого виборця ---
@@ -30,7 +30,7 @@ unregistered_voter_id = "Незареєстрований-Виборець"
 p_unregistered, q_unregistered = 151, 157
 unregistered_pub_key, unregistered_priv_key = generate_rsa_keys(p_unregistered, q_unregistered)
 unregistered_voter = Voter(unregistered_voter_id, unregistered_priv_key)
-unregistered_ballot = unregistered_voter.create_and_send_ballot("Володимир Зеленський")
+unregistered_ballot = unregistered_voter.create_ballot("Володимир Зеленський")
 cec.receive_ballot(unregistered_voter.voter_id, unregistered_ballot)
 
 cec.process_ballots()
