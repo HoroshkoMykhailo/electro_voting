@@ -3,7 +3,7 @@ import random
 from electro_voting.key_generation import gcd
 from electro_voting.hashing import quadratic_hash
 from electro_voting.blind import blind, unblind
-from electro_voting.sign import encrypt
+from electro_voting.encrypt import encrypt
 from electro_voting.candidates import CANDIDATE_TO_CODE
 
 class Voter:

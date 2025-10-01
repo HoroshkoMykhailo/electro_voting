@@ -1,8 +1,8 @@
 import random
 from electro_voting.hashing import quadratic_hash
 from electro_voting.key_generation import generate_rsa_keys
-from electro_voting.blind import blind, sign_blinded, unmask_blinded_for_verification, verify_signature
-from electro_voting.sign import decrypt
+from electro_voting.blind import  sign_blinded, unmask_blinded_for_verification, verify_signature
+from electro_voting.encrypt import decrypt
 from electro_voting.candidates import CODE_TO_CANDIDATE
 
 class CentralElectionCommission:
