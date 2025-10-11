@@ -36,17 +36,8 @@ def verify_signature(public_key, signature_int, original_message):
    
     return recovered == original_message
 
-def encode_vote_with_rp(vote: int, rp: int, rp_bits: int):
-    """
-    Кодує голос та випадковий рядок в одне число.
-    """
-    return (vote << rp_bits) | rp
+def encode_vote_with_rp( vote: int, rp: int):
+    return vote + rp
 
-def decode_vote_and_rp(encoded: int, rp_bits: int):
-    """
-    Декодує число, повертаючи голос та випадковий рядок.
-    """
-    rp_mask = (1 << rp_bits) - 1
-    rp = encoded & rp_mask
-    vote = encoded >> rp_bits
-    return vote, rp
+def decode_vote_and_rp(vote: int, rp: int):
+    return vote - rp

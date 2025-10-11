@@ -3,65 +3,72 @@ from electro_voting.encrypt import encrypt, decrypt, sign, encode_vote_with_rp, 
 from electro_voting.hashing import int_hash
 
 class Voter:
-    def __init__(self, name, keypair, rp_bits=8):
+    def __init__(self, name, keypair):
         self.name = name
+        self.encrypted1 = None
+        self.encrypted2 = None
         self.public_key, self.private_key = keypair
-        self.rp_bits = rp_bits
-        self.rp1 = random.randrange(1, 1 << rp_bits)
-        self.rp2 = random.randrange(1, 1 << rp_bits)
-        print(f"👤 Створено {self.name}, rp1={self.rp1}, rp2={self.rp2}")
+        self.rp1 = random.randrange(1, 100)
+        self.rp2 = random.randrange(1, 100)
+        print(f"👤 Створено {self.name}")
 
     def create_ballot(self, vote_id: int, voter_objects_ordered):
         """
-        Створює єдиний пакет даних (payload), який містить
-        в собі голос та обидва маркери за принципом матрьошки.
-        Цей пакет шифрується ОДИН раз усіма ключами.
+        Створює бюлетень, зашифрований у два раунди:
+        1. Перший раунд: шифрування відкритими ключами E→D→C→B→A.
+           Коли черга доходить до поточного виборця, додається RP перед шифруванням.
+        2. Другий раунд: повторення першого етапу шифрування.
         """
-        inner_payload = encode_vote_with_rp(vote_id, self.rp1, self.rp_bits)
+        # --- 1️⃣ Базовий бюлетень (без RP) ---
+        encrypted_ballot = vote_id
 
-        outer_payload = encode_vote_with_rp(inner_payload, self.rp2, self.rp_bits)
-        
-        n = self.public_key[1]
-        if outer_payload >= n:
-            raise Exception(f"Помилка: згенерований пакет ({outer_payload}) більший за модуль n ({n}). Зменшіть RP_BITS або збільшіть діапазон простих чисел.")
-
-        encrypted_ballot = outer_payload
+        # --- 2️⃣ Перший раунд шифрування ---
         for voter in reversed(voter_objects_ordered):
+            if voter.name == self.name:
+                self.encrypted1 = encrypted_ballot
+                encrypted_ballot = encode_vote_with_rp(encrypted_ballot, self.rp1)
+            encrypted_ballot = encrypt(voter.public_key, encrypted_ballot)
+
+        # --- 3️⃣ Другий раунд шифрування ---
+        for voter in reversed(voter_objects_ordered):
+            if voter.name == self.name:
+                self.encrypted2 = encrypted_ballot
+                encrypted_ballot = encode_vote_with_rp(encrypted_ballot, self.rp2)
             encrypted_ballot = encrypt(voter.public_key, encrypted_ballot)
 
         return encrypted_ballot
 
-    def mix_and_decrypt_step(self, ballot_list):
+    def mix_and_decrypt_step(self, ballot_list, round_num):
         """
-        Знімає один шар шифрування з усіх бюлетенів, перемішує і підписує.
+        Знімає один шар шифрування з усіх бюлетенів, перемішує,
+        перевіряє RP і видаляє його тільки зі свого бюлетеня.
+        
+        round_num = 1 -> перевірка rp2
+        round_num = 2 -> перевірка rp1
         """
         print(f"  -> {self.name} розшифровує і перемішує {len(ballot_list)} бюлетенів.")
-        decrypted_list = [decrypt(self.private_key, b) for b in ballot_list]
+
+        rp_to_check = self.rp2 if round_num == 1 else self.rp1
+        encrypted_to_check = self.encrypted2 if round_num == 1 else self.encrypted1
+
+        found_own_ballot = False
+
+        decrypted_list = []
+        for ballot in ballot_list:
+            decrypted = decrypt(self.private_key, ballot)
+            vote = decode_vote_and_rp(decrypted, rp_to_check)
+            if encrypted_to_check == vote:
+                decrypted = vote
+                found_own_ballot = True
+            decrypted_list.append(decrypted)
+
+        if not found_own_ballot:
+            raise Exception(f"!!! ПОМИЛКА: {self.name} не знайшов свій бюлетень у раунді {round_num}!")
+        
         random.shuffle(decrypted_list)
 
         list_tuple = tuple(sorted(decrypted_list))
         data_hash = int_hash(list_tuple, self.public_key[1])
         signature = sign(self.private_key, data_hash)
-        
-        return decrypted_list, signature
 
-    def find_and_unwrap_ballot(self, ballot_list, round_num):
-        """
-        Знаходить свій бюлетень у списку ПІСЛЯ повного раунду розшифрування
-        і видаляє відповідний маркер (rp).
-        """
-        rp_to_check = self.rp2 if round_num == 1 else self.rp1
-        
-        for ballot in ballot_list:
-            if round_num == 1:
-                decoded_message, rp_candidate = decode_vote_and_rp(ballot, self.rp_bits)
-                if rp_candidate == rp_to_check:
-                    print(f"     - {self.name} знайшов свій бюлетень (раунд 1, rp={rp_to_check}) і видалив зовнішній маркер.")
-                    return decoded_message 
-            else:
-                decoded_message, rp_candidate = decode_vote_and_rp(ballot, self.rp_bits)
-                if rp_candidate == rp_to_check:
-                    print(f"     - {self.name} знайшов свій бюлетень (раунд 2, rp={rp_to_check}) і видалив внутрішній маркер.")
-                    return decoded_message 
-        
-        raise Exception(f"!!! ПОМИЛКА: {self.name} не знайшов свій бюлетень в кінці раунду {round_num}!")
+        return decrypted_list, signature
